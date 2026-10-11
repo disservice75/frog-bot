@@ -9,12 +9,10 @@ import requests
 import traceback
 from PIL import Image, ImageDraw, ImageFont
 
-# ---------- HTTP-сервер для Render (чтобы не засыпал) ----------
 from flask import Flask
 from threading import Thread
 
 
-# ---------- Пути ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -22,7 +20,6 @@ def abspath(p):
     return p if os.path.isabs(p) else os.path.join(BASE_DIR, p)
 
 
-# ---------- Конфиг ----------
 CONFIG_PATH = abspath('config.json')
 try:
     with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
@@ -37,7 +34,6 @@ except json.JSONDecodeError as e:
 DAYS = CONFIG['days']
 DIGITS = CONFIG['digits']
 
-# ---------- Переменные окружения (секреты НЕ в коде) ----------
 TOKEN = os.environ.get("VK_TOKEN")
 GROUP_ID = os.environ.get("VK_GROUP_ID")
 
@@ -51,11 +47,9 @@ try:
 except ValueError:
     raise SystemExit("Ошибка: VK_GROUP_ID должен быть числом")
 
-# Инициализация VK
 vk_session = vk_api.VkApi(token=TOKEN)
 vk = vk_session.get_api()
 
-# Хранилища
 user_states = {}
 last_message = {}
 processing = {}
@@ -67,7 +61,6 @@ def log(*args):
     print("[BOT]", *args, flush=True)
 
 
-# ---------- HTTP-сервер для пинга Render ----------
 app = Flask(__name__)
 
 
@@ -81,7 +74,6 @@ def run_http_server():
     app.run(host="0.0.0.0", port=port)
 
 
-# ---------- Вспомогательные функции ----------
 def is_duplicate(user_id, text):
     now = time.time()
     prev = last_message.get(user_id)
@@ -213,23 +205,25 @@ def send_message(user_id, message, attachment=None):
         log(f"Ошибка отправки сообщения: {e}")
 
 
-# ---------- Основная логика ----------
 def main():
     log("Бот запущен. VkBotLongPoll слушает...")
     log(f"BASE_DIR = {BASE_DIR}")
     log(f"GROUP_ID = {GROUP_ID}")
 
-    # ВАЖНО: используем VkBotLongPoll, а не VkLongPoll
     longpoll = VkBotLongPoll(vk_session, group_id=GROUP_ID)
 
     for event in longpoll.listen():
+        # ОТЛАДКА: логируем ВСЕ события
+        log(f"ПОЛУЧЕНО СОБЫТИЕ: type={event.type}")
+
         if event.type != VkBotEventType.MESSAGE_NEW:
             continue
 
-        # В bot_longpoll структура другая
         message = event.object.message
         user_id = message['from_id']
         text = message.get('text', '').strip().lower()
+
+        log(f"Текст: {text!r}, от user_id={user_id}")
 
         if not text:
             continue
@@ -244,7 +238,6 @@ def main():
 
         log(f"Сообщение от {user_id}: {text!r}")
 
-        # Шаг 1: старт
         if text == "начать":
             user_states.pop(user_id, None)
             send_message(user_id, "📅 Введите число вашего рождения (от 1 до 31):")
@@ -252,7 +245,6 @@ def main():
 
         state = user_states.get(user_id)
 
-        # Шаг 3: цифра дома (0–9)
         if state is not None and "day_index" in state:
             if not text.isdigit() or not (0 <= int(text) <= 9):
                 send_message(user_id, "Пожалуйста, введите одну цифру от 0 до 9.")
@@ -314,7 +306,6 @@ def main():
 
             continue
 
-        # Шаг 2: день месяца (1–31)
         if text.isdigit():
             day_num = int(text)
             if 1 <= day_num <= 31:
@@ -329,7 +320,6 @@ def main():
             send_message(user_id, "Пожалуйста, введите число от 1 до 31.")
 
 
-# ---------- ЗАПУСК С АВТО-ПЕРЕЗАПУСКОМ ----------
 if __name__ == "__main__":
     http_thread = Thread(target=run_http_server, daemon=True)
     http_thread.start()
