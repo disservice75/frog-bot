@@ -74,6 +74,22 @@ def run_http_server():
     app.run(host="0.0.0.0", port=port)
 
 
+def is_subscribed(user_id):
+    """Проверяет, подписан ли пользователь на сообщество."""
+    try:
+        result = vk.groups.isMember(
+            group_id=GROUP_ID,
+            user_id=user_id
+        )
+        # result приходит в виде списка [{'member': 1, 'user_id': ...}]
+        if isinstance(result, list) and len(result) > 0:
+            return result[0].get('member', 0) == 1
+        return False
+    except Exception as e:
+        log(f"Ошибка проверки подписки для {user_id}: {e}")
+        return False
+
+
 def is_duplicate(user_id, text):
     now = time.time()
     prev = last_message.get(user_id)
@@ -213,8 +229,6 @@ def main():
     longpoll = VkLongPoll(vk_session, group_id=GROUP_ID)
 
     for event in longpoll.listen():
-        log(f"ПОЛУЧЕНО СОБЫТИЕ: type={event.type}")
-
         if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
             continue
         if not event.text:
@@ -222,8 +236,6 @@ def main():
 
         user_id = event.user_id
         text = event.text.strip().lower()
-
-        log(f"Текст: {text!r}, от user_id={user_id}")
 
         if processing.get(user_id):
             log(f"Пользователь {user_id} занят генерацией, пропускаю: {text!r}")
@@ -235,6 +247,16 @@ def main():
 
         log(f"Сообщение от {user_id}: {text!r}")
 
+        # ---------- ПРОВЕРКА ПОДПИСКИ ----------
+        if not is_subscribed(user_id):
+            log(f"Пользователь {user_id} не подписан на сообщество")
+            send_message(
+                user_id,
+                "⚠️ Чтобы пользоваться ботом, подпишитесь на сообщество."
+            )
+            continue
+
+        # Шаг 1: старт
         if text == "начать":
             user_states.pop(user_id, None)
             send_message(user_id, "📅 Введите число вашего рождения (от 1 до 31):")
@@ -242,6 +264,7 @@ def main():
 
         state = user_states.get(user_id)
 
+        # Шаг 3: цифра дома (0–9)
         if state is not None and "day_index" in state:
             if not text.isdigit() or not (0 <= int(text) <= 9):
                 send_message(user_id, "Пожалуйста, введите одну цифру от 0 до 9.")
@@ -303,6 +326,7 @@ def main():
 
             continue
 
+        # Шаг 2: день месяца (1–31)
         if text.isdigit():
             day_num = int(text)
             if 1 <= day_num <= 31:
