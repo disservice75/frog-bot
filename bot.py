@@ -75,18 +75,25 @@ def run_http_server():
 
 
 def is_subscribed(user_id):
-    """Проверяет, подписан ли пользователь на сообщество."""
+    """Проверяет, подписан ли пользователь на сообщество. С логом ответа VK."""
     try:
         result = vk.groups.isMember(
             group_id=GROUP_ID,
             user_id=user_id
         )
-        # result приходит в виде списка [{'member': 1, 'user_id': ...}]
+        log(f"isMember ответ для user_id={user_id}: {result}")
+
         if isinstance(result, list) and len(result) > 0:
-            return result[0].get('member', 0) == 1
+            member = result[0].get('member', 0)
+            log(f"Поле member = {member} (1=подписан, 0=нет)")
+            return member == 1
+
+        log(f"Неожиданный формат ответа: {type(result)}")
         return False
+
     except Exception as e:
         log(f"Ошибка проверки подписки для {user_id}: {e}")
+        traceback.print_exc()
         return False
 
 
@@ -248,8 +255,11 @@ def main():
         log(f"Сообщение от {user_id}: {text!r}")
 
         # ---------- ПРОВЕРКА ПОДПИСКИ ----------
-        if not is_subscribed(user_id):
-            log(f"Пользователь {user_id} не подписан на сообщество")
+        subscribed = is_subscribed(user_id)
+        log(f"Результат проверки подписки для {user_id}: {subscribed}")
+
+        if not subscribed:
+            log(f"Пользователь {user_id} не подписан — отказ")
             send_message(
                 user_id,
                 "⚠️ Чтобы пользоваться ботом, подпишитесь на сообщество."
