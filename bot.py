@@ -117,6 +117,7 @@ def create_final_image(background_path, text_to_draw):
     txt_layer = Image.new('RGBA', base.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(txt_layer)
 
+    # Шрифт +25% от базового размера
     font_size = max(10, int(height * 0.08 * 1.25))
     font = get_font(font_size)
 
@@ -128,7 +129,7 @@ def create_final_image(background_path, text_to_draw):
         text_w, text_h = draw.textsize(text_to_draw, font=font)
 
     x = (width - text_w) / 2
-    y = 40
+    y = 40  # Текст сверху
 
     draw.text((x - 3, y - 3), text_to_draw, font=font, fill=(0, 0, 0, 150))
     draw.text((x, y), text_to_draw, font=font, fill=(255, 255, 255, 255))
@@ -240,7 +241,7 @@ def main():
 
         log(f"Сообщение от {user_id}: {text!r}")
 
-        # Шаг 1
+        # Шаг 1: старт
         if text == "начать":
             user_states.pop(user_id, None)
             send_message(user_id, "📅 Введите число вашего рождения (от 1 до 31):")
@@ -248,7 +249,7 @@ def main():
 
         state = user_states.get(user_id)
 
-        # Шаг 3
+        # Шаг 3: цифра дома (0–9)
         if state is not None and "day_index" in state:
             if not text.isdigit() or not (0 <= int(text) <= 9):
                 send_message(user_id, "Пожалуйста, введите одну цифру от 0 до 9.")
@@ -298,6 +299,7 @@ def main():
                 if access_key:
                     attachment += f'_{access_key}'
 
+                # Только картинка, без подписи
                 send_message(user_id, "", attachment=attachment)
 
                 if os.path.exists(final_image_path):
@@ -310,7 +312,7 @@ def main():
 
             continue
 
-        # Шаг 2
+        # Шаг 2: день месяца (1–31)
         if text.isdigit():
             day_num = int(text)
             if 1 <= day_num <= 31:
@@ -325,9 +327,19 @@ def main():
             send_message(user_id, "Пожалуйста, введите число от 1 до 31.")
 
 
+# ---------- ЗАПУСК С АВТО-ПЕРЕЗАПУСКОМ ----------
 if __name__ == "__main__":
+    # Flask-сервер для health check запускаем в фоновом потоке
     http_thread = Thread(target=run_http_server, daemon=True)
     http_thread.start()
     log("HTTP-сервер запущен для health check")
 
-    main()
+    # Бесконечный цикл: если main() падает — перезапускаем через 5 секунд
+    while True:
+        try:
+            main()
+        except Exception as e:
+            log(f"MAIN УПАЛ: {e}")
+            traceback.print_exc()
+            log("Перезапуск через 5 секунд...")
+            time.sleep(5)
