@@ -75,7 +75,7 @@ def run_http_server():
 
 
 def is_subscribed(user_id):
-    """Проверяет, подписан ли пользователь на сообщество. С логом ответа VK."""
+    """Проверяет, подписан ли пользователь на сообщество."""
     try:
         result = vk.groups.isMember(
             group_id=GROUP_ID,
@@ -83,9 +83,21 @@ def is_subscribed(user_id):
         )
         log(f"isMember ответ для user_id={user_id}: {result}")
 
+        # Вариант 1: vk_api вернул просто число (0 или 1)
+        if isinstance(result, int):
+            log(f"Формат: число, member = {result}")
+            return result == 1
+
+        # Вариант 2: вернул список словарей [{'member': 1, ...}]
         if isinstance(result, list) and len(result) > 0:
             member = result[0].get('member', 0)
-            log(f"Поле member = {member} (1=подписан, 0=нет)")
+            log(f"Формат: список, member = {member}")
+            return member == 1
+
+        # Вариант 3: вернул словарь {'member': 1}
+        if isinstance(result, dict):
+            member = result.get('member', 0)
+            log(f"Формат: словарь, member = {member}")
             return member == 1
 
         log(f"Неожиданный формат ответа: {type(result)}")
