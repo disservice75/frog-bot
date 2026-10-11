@@ -210,10 +210,10 @@ def main():
     log(f"BASE_DIR = {BASE_DIR}")
     log(f"GROUP_ID = {GROUP_ID}")
 
-    longpoll = VkBotLongPoll(vk_session, group_id=GROUP_ID)
+    # wait=60 — VK держит соединение 60 секунд
+    longpoll = VkBotLongPoll(vk_session, group_id=GROUP_ID, wait=60)
 
     for event in longpoll.listen():
-        # ОТЛАДКА: логируем ВСЕ события
         log(f"ПОЛУЧЕНО СОБЫТИЕ: type={event.type}")
 
         if event.type != VkBotEventType.MESSAGE_NEW:
@@ -331,5 +331,5 @@ if __name__ == "__main__":
         except Exception as e:
             log(f"MAIN УПАЛ: {e}")
             traceback.print_exc()
-            log("Перезапуск через 5 секунд...")
-            time.sleep(5)
+            log("Перезапуск через 15 секунд...")
+            time.sleep(15)
