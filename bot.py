@@ -1,5 +1,5 @@
 import vk_api
-from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.utils import get_random_id
 
 import json
@@ -42,9 +42,9 @@ TOKEN = os.environ.get("VK_TOKEN")
 GROUP_ID = os.environ.get("VK_GROUP_ID")
 
 if not TOKEN:
-    raise SystemExit("Ошибка: переменная VK_TOKEN не задана в Environment Variables")
+    raise SystemExit("Ошибка: переменная VK_TOKEN не задана")
 if not GROUP_ID:
-    raise SystemExit("Ошибка: переменная VK_GROUP_ID не задана в Environment Variables")
+    raise SystemExit("Ошибка: переменная VK_GROUP_ID не задана")
 
 try:
     GROUP_ID = int(GROUP_ID)
@@ -117,7 +117,6 @@ def create_final_image(background_path, text_to_draw):
     txt_layer = Image.new('RGBA', base.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(txt_layer)
 
-    # Шрифт +25% от базового размера
     font_size = max(10, int(height * 0.08 * 1.25))
     font = get_font(font_size)
 
@@ -129,7 +128,7 @@ def create_final_image(background_path, text_to_draw):
         text_w, text_h = draw.textsize(text_to_draw, font=font)
 
     x = (width - text_w) / 2
-    y = 40  # Текст сверху
+    y = 40
 
     draw.text((x - 3, y - 3), text_to_draw, font=font, fill=(0, 0, 0, 150))
     draw.text((x, y), text_to_draw, font=font, fill=(255, 255, 255, 255))
@@ -216,20 +215,24 @@ def send_message(user_id, message, attachment=None):
 
 # ---------- Основная логика ----------
 def main():
-    log("Бот запущен. Long Poll слушает...")
+    log("Бот запущен. VkBotLongPoll слушает...")
     log(f"BASE_DIR = {BASE_DIR}")
     log(f"GROUP_ID = {GROUP_ID}")
 
-    longpoll = VkLongPoll(vk_session, group_id=GROUP_ID)
+    # ВАЖНО: используем VkBotLongPoll, а не VkLongPoll
+    longpoll = VkBotLongPoll(vk_session, group_id=GROUP_ID)
 
     for event in longpoll.listen():
-        if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
-            continue
-        if not event.text:
+        if event.type != VkBotEventType.MESSAGE_NEW:
             continue
 
-        user_id = event.user_id
-        text = event.text.strip().lower()
+        # В bot_longpoll структура другая
+        message = event.object.message
+        user_id = message['from_id']
+        text = message.get('text', '').strip().lower()
+
+        if not text:
+            continue
 
         if processing.get(user_id):
             log(f"Пользователь {user_id} занят генерацией, пропускаю: {text!r}")
@@ -299,7 +302,6 @@ def main():
                 if access_key:
                     attachment += f'_{access_key}'
 
-                # Только картинка, без подписи
                 send_message(user_id, "", attachment=attachment)
 
                 if os.path.exists(final_image_path):
@@ -329,12 +331,10 @@ def main():
 
 # ---------- ЗАПУСК С АВТО-ПЕРЕЗАПУСКОМ ----------
 if __name__ == "__main__":
-    # Flask-сервер для health check запускаем в фоновом потоке
     http_thread = Thread(target=run_http_server, daemon=True)
     http_thread.start()
     log("HTTP-сервер запущен для health check")
 
-    # Бесконечный цикл: если main() падает — перезапускаем через 5 секунд
     while True:
         try:
             main()
