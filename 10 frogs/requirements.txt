@@ -1,4 +1,0 @@
-vk_api
-Pillow
-requests
-flask
