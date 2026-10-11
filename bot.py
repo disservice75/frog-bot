@@ -1,5 +1,5 @@
 import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 
 import json
@@ -206,27 +206,24 @@ def send_message(user_id, message, attachment=None):
 
 
 def main():
-    log("Бот запущен. VkBotLongPoll слушает...")
+    log("Бот запущен. VkLongPoll слушает...")
     log(f"BASE_DIR = {BASE_DIR}")
     log(f"GROUP_ID = {GROUP_ID}")
 
-    # wait=60 — VK держит соединение 60 секунд
-    longpoll = VkBotLongPoll(vk_session, group_id=GROUP_ID, wait=60)
+    longpoll = VkLongPoll(vk_session, group_id=GROUP_ID)
 
     for event in longpoll.listen():
         log(f"ПОЛУЧЕНО СОБЫТИЕ: type={event.type}")
 
-        if event.type != VkBotEventType.MESSAGE_NEW:
+        if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
+            continue
+        if not event.text:
             continue
 
-        message = event.object.message
-        user_id = message['from_id']
-        text = message.get('text', '').strip().lower()
+        user_id = event.user_id
+        text = event.text.strip().lower()
 
         log(f"Текст: {text!r}, от user_id={user_id}")
-
-        if not text:
-            continue
 
         if processing.get(user_id):
             log(f"Пользователь {user_id} занят генерацией, пропускаю: {text!r}")
@@ -331,5 +328,5 @@ if __name__ == "__main__":
         except Exception as e:
             log(f"MAIN УПАЛ: {e}")
             traceback.print_exc()
-            log("Перезапуск через 15 секунд...")
-            time.sleep(15)
+            log("Перезапуск через 5 секунд...")
+            time.sleep(5)
