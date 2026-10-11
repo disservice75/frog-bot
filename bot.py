@@ -37,7 +37,7 @@ except json.JSONDecodeError as e:
 DAYS = CONFIG['days']
 DIGITS = CONFIG['digits']
 
-# ---------- Переменные окружения Render ----------
+# ---------- Переменные окружения (секреты НЕ в коде) ----------
 TOKEN = os.environ.get("VK_TOKEN")
 GROUP_ID = os.environ.get("VK_GROUP_ID")
 
@@ -67,18 +67,16 @@ def log(*args):
     print("[BOT]", *args, flush=True)
 
 
-# ---------- HTTP-сервер для пинга ----------
+# ---------- HTTP-сервер для пинга Render ----------
 app = Flask(__name__)
 
 
 @app.route('/healthz')
 def healthz():
-    """Лёгкий эндпоинт для UptimeRobot / Render health check."""
     return {"status": "ok"}, 200
 
 
 def run_http_server():
-    """Запускает Flask в отдельном потоке, чтобы не мешать Long Poll."""
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
@@ -119,7 +117,6 @@ def create_final_image(background_path, text_to_draw):
     txt_layer = Image.new('RGBA', base.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(txt_layer)
 
-    # Шрифт +25%
     font_size = max(10, int(height * 0.08 * 1.25))
     font = get_font(font_size)
 
@@ -329,10 +326,8 @@ def main():
 
 
 if __name__ == "__main__":
-    # Запускаем HTTP-сервер для Render в фоне
     http_thread = Thread(target=run_http_server, daemon=True)
     http_thread.start()
     log("HTTP-сервер запущен для health check")
 
-    # Запускаем бота
     main()
